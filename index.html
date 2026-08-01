@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>KoleQuant</title>
+  <script>
+    (function () {
+      var preferred = 'bg';
+      try {
+        var saved = localStorage.getItem('kolequant-language');
+        if (saved === 'en' || saved === 'bg') preferred = saved;
+        else if ((navigator.language || '').toLowerCase().startsWith('en')) preferred = 'bg';
+      } catch (_) {}
+      window.location.replace('./' + preferred + '/index.html');
+    }());
+  </script>
+  <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#071017;color:#fff;font:16px system-ui,sans-serif}a{color:#6eddec}p{max-width:620px;text-align:center;line-height:1.6}</style>
+</head>
+<body><p>Отваряне на KoleQuant… <a href="bg/index.html">Български</a> · <a href="en/index.html">English</a></p></body>
+</html>
