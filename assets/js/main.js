@@ -64,6 +64,70 @@
 
   const emailForms = [...document.querySelectorAll('form[action^="https://formsubmit.co/"]')];
   emailForms.forEach((form) => {
+    const language = document.documentElement.lang === 'bg' ? 'bg' : 'en';
+    const interestField = form.querySelector('#e-interest, #b-interest');
+    const interestWrapper = interestField?.closest('.field');
+    const interestLabel = interestWrapper?.querySelector('label');
+    const consentText = form.querySelector('.checkbox span');
+    const subjectField = form.querySelector('input[name="_subject"]');
+
+    if (interestField) {
+      interestField.name = 'contact_type';
+      interestField.innerHTML = language === 'bg'
+        ? '<option value="waiting_list">Списък с чакащи</option><option value="newsletter">Бюлетин</option><option value="general_inquiry">Общо запитване</option>'
+        : '<option value="waiting_list">Join the waiting list</option><option value="newsletter">Join the newsletter</option><option value="general_inquiry">General inquiry</option>';
+      if (interestLabel) {
+        interestLabel.textContent = language === 'bg' ? 'Причина за контакт' : 'How can we help?';
+      }
+
+      const messageWrapper = document.createElement('div');
+      messageWrapper.className = 'field full';
+      const messageId = language === 'bg' ? 'b-message' : 'e-message';
+      messageWrapper.innerHTML = language === 'bg'
+        ? `<label for="${messageId}">Съобщение <span>(по избор)</span></label><textarea id="${messageId}" name="message" rows="5" placeholder="Напиши кратко съобщение, ако имаш конкретен въпрос."></textarea>`
+        : `<label for="${messageId}">Message <span>(optional)</span></label><textarea id="${messageId}" name="message" rows="5" placeholder="Add a short message if you have a specific question."></textarea>`;
+      interestWrapper?.insertAdjacentElement('afterend', messageWrapper);
+
+      const messageField = messageWrapper.querySelector('textarea');
+      const updateFormMode = () => {
+        const isGeneralInquiry = interestField.value === 'general_inquiry';
+        if (messageField) {
+          messageField.required = isGeneralInquiry;
+          const label = messageWrapper.querySelector('label');
+          if (label) {
+            label.innerHTML = isGeneralInquiry
+              ? (language === 'bg' ? 'Съобщение' : 'Message')
+              : (language === 'bg' ? 'Съобщение <span>(по избор)</span>' : 'Message <span>(optional)</span>');
+          }
+        }
+        if (consentText) {
+          consentText.textContent = isGeneralInquiry
+            ? (language === 'bg'
+                ? 'Съгласявам се данните ми да бъдат използвани, за да получа отговор на запитването си.'
+                : 'I agree that my details may be used to respond to my inquiry.')
+            : (language === 'bg'
+                ? 'Съгласявам се да получавам съобщения от KoleQuant и Nytheria. Разбирам, че мога да се отпиша по всяко време.'
+                : 'I agree to receive communications from KoleQuant and Nytheria. I understand that I can unsubscribe at any time.');
+        }
+        if (subjectField) {
+          const subjects = language === 'bg'
+            ? {
+                waiting_list: 'Нова регистрация в списъка с чакащи за Nytheria',
+                newsletter: 'Нова регистрация за бюлетина на KoleQuant',
+                general_inquiry: 'Ново общо запитване през kolequant.xyz'
+              }
+            : {
+                waiting_list: 'New Nytheria waiting-list registration',
+                newsletter: 'New KoleQuant newsletter registration',
+                general_inquiry: 'New general inquiry from kolequant.xyz'
+              };
+          subjectField.value = subjects[interestField.value] || subjects.waiting_list;
+        }
+      };
+      interestField.addEventListener('change', updateFormMode);
+      updateFormMode();
+    }
+
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
 
@@ -71,7 +135,6 @@
 
       const submitButton = form.querySelector('[type="submit"]');
       const originalButtonContent = submitButton?.innerHTML;
-      const language = document.documentElement.lang === 'bg' ? 'bg' : 'en';
 
       let status = form.querySelector('[data-form-status]');
       if (!status) {
@@ -92,7 +155,7 @@
         'b-email': 'email',
         'b-country': 'country',
         'b-city': 'city',
-        'b-interest': 'interest'
+        'b-interest': 'contact_type'
       };
       Object.entries(fieldNames).forEach(([id, name]) => {
         const field = form.querySelector(`#${id}`);
@@ -126,18 +189,19 @@
         }
 
         status.textContent = language === 'bg'
-          ? 'Благодарим! Регистрацията ти е изпратена успешно.'
-          : 'Thank you! Your registration has been sent successfully.';
+          ? 'Благодарим! Формата е изпратена успешно.'
+          : 'Thank you! Your form has been sent successfully.';
         status.style.display = 'block';
         status.style.background = 'rgba(28, 120, 91, 0.12)';
         status.style.border = '1px solid rgba(28, 120, 91, 0.3)';
         status.style.color = 'inherit';
         form.reset();
+        if (interestField) interestField.dispatchEvent(new Event('change'));
         status.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } catch (_) {
         status.textContent = language === 'bg'
-          ? 'Не успяхме да изпратим регистрацията. Моля, опитай отново след малко.'
-          : 'We could not send your registration. Please try again in a moment.';
+          ? 'Не успяхме да изпратим формата. Моля, опитай отново след малко.'
+          : 'We could not send the form. Please try again in a moment.';
         status.style.display = 'block';
         status.style.background = 'rgba(160, 45, 55, 0.1)';
         status.style.border = '1px solid rgba(160, 45, 55, 0.28)';
