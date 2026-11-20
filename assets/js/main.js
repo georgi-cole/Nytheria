@@ -42,23 +42,31 @@
 
   const tabs = [...document.querySelectorAll('.domain-tab')];
   const panels = [...document.querySelectorAll('.domain-panel')];
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      const target = tab.dataset.domain;
-      tabs.forEach((item) => item.classList.toggle('active', item === tab));
-      panels.forEach((panel) => panel.classList.toggle('active', panel.dataset.domainPanel === target));
-      tabs.forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
+  const selectDomain = (tab) => {
+    tabs.forEach((item) => {
+      const selected = item === tab;
+      item.classList.toggle('active', selected);
+      item.setAttribute('aria-selected', String(selected));
+      item.tabIndex = selected ? 0 : -1;
     });
-  });
-
-  document.querySelectorAll('form[data-prototype-form]').forEach((form) => {
-    form.addEventListener('submit', (event) => {
+    panels.forEach((panel) => panel.classList.toggle('active', panel.dataset.domainPanel === tab.dataset.domain));
+  };
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => selectDomain(tab));
+    tab.addEventListener('keydown', (event) => {
+      const destinations = {
+        ArrowDown: (index + 1) % tabs.length,
+        ArrowUp: (index + tabs.length - 1) % tabs.length,
+        ArrowRight: (index + 1) % tabs.length,
+        ArrowLeft: (index + tabs.length - 1) % tabs.length,
+        Home: 0,
+        End: tabs.length - 1
+      };
+      if (!Object.hasOwn(destinations, event.key)) return;
       event.preventDefault();
-      const message = form.querySelector('.form-message');
-      if (message) message.classList.add('show');
-      const submit = form.querySelector('[type="submit"]');
-      if (submit) submit.disabled = true;
-      message?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const next = tabs[destinations[event.key]];
+      selectDomain(next);
+      next.focus();
     });
   });
 
@@ -67,19 +75,10 @@
     const language = document.documentElement.lang === 'bg' ? 'bg' : 'en';
     const interestField = form.querySelector('#e-interest, #b-interest');
     const interestWrapper = interestField?.closest('.field');
-    const interestLabel = interestWrapper?.querySelector('label');
     const consentText = form.querySelector('.checkbox span');
     const subjectField = form.querySelector('input[name="_subject"]');
 
     if (interestField) {
-      interestField.name = 'contact_type';
-      interestField.innerHTML = language === 'bg'
-        ? '<option value="waiting_list">Списък с чакащи</option><option value="newsletter">Бюлетин</option><option value="general_inquiry">Общо запитване</option>'
-        : '<option value="waiting_list">Join the waiting list</option><option value="newsletter">Join the newsletter</option><option value="general_inquiry">General inquiry</option>';
-      if (interestLabel) {
-        interestLabel.textContent = language === 'bg' ? 'Причина за контакт' : 'How can we help?';
-      }
-
       const messageWrapper = document.createElement('div');
       messageWrapper.className = 'field full';
       const messageId = language === 'bg' ? 'b-message' : 'e-message';
@@ -125,6 +124,7 @@
         }
       };
       interestField.addEventListener('change', updateFormMode);
+      if (/(?:#|\/)enquiries$/.test(window.location.hash)) interestField.value = 'general_inquiry';
       updateFormMode();
     }
 
@@ -134,7 +134,7 @@
       if (!form.reportValidity()) return;
 
       const submitButton = form.querySelector('[type="submit"]');
-      const originalButtonContent = submitButton?.innerHTML;
+      const originalButtonText = submitButton?.textContent;
 
       let status = form.querySelector('[data-form-status]');
       if (!status) {
@@ -142,25 +142,9 @@
         status.dataset.formStatus = '';
         status.setAttribute('role', 'status');
         status.setAttribute('aria-live', 'polite');
-        status.style.marginTop = '18px';
-        status.style.padding = '14px 16px';
-        status.style.borderRadius = '12px';
-        status.style.display = 'none';
+        status.hidden = true;
         form.appendChild(status);
       }
-
-      const fieldNames = {
-        'b-first': 'first_name',
-        'b-last': 'last_name',
-        'b-email': 'email',
-        'b-country': 'country',
-        'b-city': 'city',
-        'b-interest': 'contact_type'
-      };
-      Object.entries(fieldNames).forEach(([id, name]) => {
-        const field = form.querySelector(`#${id}`);
-        if (field && !field.name) field.name = name;
-      });
 
       const formData = new FormData(form);
       formData.set('_captcha', 'false');
@@ -174,7 +158,7 @@
         submitButton.textContent = language === 'bg' ? 'Изпращане...' : 'Sending...';
       }
 
-      status.style.display = 'none';
+      status.hidden = true;
 
       try {
         const response = await fetch(ajaxAction, {
@@ -184,17 +168,15 @@
         });
         const result = await response.json().catch(() => ({}));
 
-        if (!response.ok || result.success === false) {
+        if (!response.ok || ![true, 'true'].includes(result.success)) {
           throw new Error(result.message || 'Submission failed');
         }
 
         status.textContent = language === 'bg'
           ? 'Благодарим! Формата е изпратена успешно.'
           : 'Thank you! Your form has been sent successfully.';
-        status.style.display = 'block';
-        status.style.background = 'rgba(28, 120, 91, 0.12)';
-        status.style.border = '1px solid rgba(28, 120, 91, 0.3)';
-        status.style.color = 'inherit';
+        status.dataset.formStatus = 'success';
+        status.hidden = false;
         form.reset();
         if (interestField) interestField.dispatchEvent(new Event('change'));
         status.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -202,16 +184,15 @@
         status.textContent = language === 'bg'
           ? 'Не успяхме да изпратим формата. Моля, опитай отново след малко.'
           : 'We could not send the form. Please try again in a moment.';
-        status.style.display = 'block';
-        status.style.background = 'rgba(160, 45, 55, 0.1)';
-        status.style.border = '1px solid rgba(160, 45, 55, 0.28)';
-        status.style.color = 'inherit';
+        status.dataset.formStatus = 'error';
+        status.hidden = false;
       } finally {
         if (submitButton) {
           submitButton.disabled = false;
-          if (originalButtonContent) submitButton.innerHTML = originalButtonContent;
+          if (originalButtonText) submitButton.textContent = originalButtonText;
         }
       }
     });
   });
 })();
+
